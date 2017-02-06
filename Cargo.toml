@@ -1,0 +1,7 @@
+[package]
+name = "yo-sal"
+version = "0.1.0"
+authors = ["Mohammad AlSaleh <CE.Mohammad.AlSaleh@gmail.com>"]
+
+[dependencies]
+json = "0.11"
