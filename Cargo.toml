@@ -2,6 +2,9 @@
 name = "yo-sal"
 version = "0.1.0"
 authors = ["Mohammad AlSaleh <CE.Mohammad.AlSaleh@gmail.com>"]
+edition = "2018"
 
 [dependencies]
-json = "0.11"
+serde_json = "1"
+json = "0.12"
+unescape = "0.1"
