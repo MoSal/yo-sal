@@ -22,8 +22,9 @@ fn get_file(yt_json: &JsonValue, name: Option<String>) {
     };
 
     let info = if let JsonValue::Array(ref formats) = yt_json["formats"] {
+        let proto = |fmt: &JsonValue| fmt["protocol"].as_str().expect("protocol exists").to_owned();
         formats.iter()
-            .filter(|fmt| fmt["protocol"].as_str().expect("protocol exists").starts_with("http") || fmt["protocol"].as_str().expect("protocol exists") == "")
+            .filter(|fmt| proto(fmt).starts_with("m3u8") || proto(fmt).starts_with("http") || proto(fmt) == "")
             .last()
             .expect("atleast one format exists")
     } else {
@@ -31,22 +32,48 @@ fn get_file(yt_json: &JsonValue, name: Option<String>) {
         &yt_json
     };
 
-    let mut args = vec!["-nTrm".into(), "-a2".into()];
-    args.push(format!("{}", info["url"]).trim_matches('"').to_string());
-    args.push("-o".into());
-    args.push(fname);
+    match info["protocol"].as_str() {
+        Some(proto) if proto.starts_with("m3u8") => {
+            let mut args = vec!["--hls-segment-threads=4".into()];
 
-    if let JsonValue::Object(ref hdrs_json) = info["http_headers"] {
-        for (k, v) in hdrs_json.iter() {
-            args.push("-H".into());
-            args.push(format!("{}: {}", k, v));
-        }
+            if let JsonValue::Object(ref hdrs_json) = info["http_headers"] {
+                for (k, v) in hdrs_json.iter() {
+                    args.push("--http-header".into());
+                    args.push(format!("{}={}", k, v));
+                }
+            }
+
+            args.push(format!("{}", info["url"]).trim_matches('"').to_string());
+            args.push("best".into());
+            args.push("-o".into());
+            args.push(fname);
+            println!("Running streamlink with args: {:?}\n==========\n", args);
+            let _ = Command::new("streamlink")
+                .args(&args)
+                .status()
+                .expect("successful status");
+        },
+        _ => {
+            let mut args = vec!["-nTrm".into(), "-a2".into()];
+            args.push(format!("{}", info["url"]).trim_matches('"').to_string());
+            args.push("-o".into());
+            args.push(fname);
+
+            if let JsonValue::Object(ref hdrs_json) = info["http_headers"] {
+                for (k, v) in hdrs_json.iter() {
+                    args.push("-H".into());
+                    args.push(format!("{}: {}", k, v));
+                }
+            }
+
+            println!("Running saldl with args: {:?}\n==========\n", args);
+            let _ = Command::new("saldl")
+                .args(&args)
+                .status()
+                .expect("successful status");
+            },
     }
-    println!("Running saldl with args: {:?}\n==========\n", args);
-    let _ = Command::new("saldl")
-        .args(&args)
-        .status()
-        .expect("successful status");
+
 }
 
 fn main() {
