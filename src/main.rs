@@ -18,7 +18,8 @@ fn get_file(yt_json: &JsonValue, name: Option<String>) {
                 id,
                 unescape::unescape(title).expect("failed to unescape"),
                 ext)
-        .replace(" ", "_")
+            // replace '/' too because we may not use saldl which usually takes care of this for us
+            .replace(&[' ', '/'][..], "_")
     };
 
     let info = if let JsonValue::Array(ref formats) = yt_json["formats"] {
