@@ -1,6 +1,5 @@
 use std::process::Command;
 use std::env;
-//use json::JsonValue;
 use serde_json::Value as JsonValue;
 
 fn get_file(yt_json: &JsonValue, name: Option<String>) {
@@ -33,14 +32,24 @@ fn get_file(yt_json: &JsonValue, name: Option<String>) {
         &yt_json
     };
 
+    // Value adds quotes when turned to String (e.g. via format!() like below), so we strip the quotes
+    let strip_quotes = |s: String| {
+        let p = &['"', '\''][..];
+        s.strip_prefix(p)
+            .map(|s| s.strip_suffix(p).unwrap_or(&*s))
+            .unwrap_or(&*s)
+            .to_string()
+    };
+
     match info["protocol"].as_str() {
         Some(proto) if proto.starts_with("m3u8") => {
             let mut args = vec!["--hls-segment-threads=4".into()];
 
+
             if let JsonValue::Object(ref hdrs_json) = info["http_headers"] {
                 for (k, v) in hdrs_json.iter() {
                     args.push("--http-header".into());
-                    args.push(format!("{}={}", k, v));
+                    args.push(format!("{}={}", k, strip_quotes(v.to_string())));
                 }
             }
 
@@ -63,7 +72,7 @@ fn get_file(yt_json: &JsonValue, name: Option<String>) {
             if let JsonValue::Object(ref hdrs_json) = info["http_headers"] {
                 for (k, v) in hdrs_json.iter() {
                     args.push("-H".into());
-                    args.push(format!("{}: {}", k, v));
+                    args.push(format!("{}: {}", k, strip_quotes(v.to_string())));
                 }
             }
 
