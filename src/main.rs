@@ -109,14 +109,11 @@ fn main() {
 
 
     println!("Parsing JSON...");
-    //let yt_json = json::parse(&String::from_utf8_lossy(&info_bytes)).expect("successful JSON parse");
     let yt_json: JsonValue = serde_json::from_slice(&*info_bytes).expect("successful JSON parse");
 
     // If even with --no-playlist, we still get a playlist. Then maybe we should grab everything
-    //if yt_json["_type"].as_str().expect("string _type value") == "playlist" {
     if let Some("playlist") = yt_json["_type"].as_str() {
         // Dedup by url
-        //let mut entries = yt_json["entries"].members().collect::<Vec<_>>();
         let mut entries = yt_json["entries"].as_array().cloned().expect("not array");
         let pre_dedup_len = entries.len();
         println!("[warning] multiple entries {} in an unexpected playlist.", pre_dedup_len);
