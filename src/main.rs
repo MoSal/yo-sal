@@ -43,7 +43,7 @@ fn get_file(yt_json: &JsonValue, name: Option<String>) {
 
     match info["protocol"].as_str() {
         Some(proto) if proto.starts_with("m3u8") => {
-            let mut args = vec!["--hls-segment-threads=4".into()];
+            let mut args = vec!["--hls-segment-threads=2".into(), "--ringbuffer-size=100M".into()];
 
 
             if let JsonValue::Object(ref hdrs_json) = info["http_headers"] {
