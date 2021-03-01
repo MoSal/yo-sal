@@ -23,12 +23,20 @@ fn get_file(yt_json: &JsonValue, name: Option<String>) {
 
     let info = if let JsonValue::Array(ref formats) = yt_json["formats"] {
         let proto = |fmt: &JsonValue| fmt["protocol"].as_str().expect("protocol exists").to_owned();
-        // DASH streams might have http/https proto and mp4_dash container.
-        // So, we don't have to change anything here.
-        formats.iter()
-            .filter(|fmt| proto(fmt).starts_with("m3u8") || proto(fmt).starts_with("http") || proto(fmt) == "")
-            .last()
-            .expect("atleast one format exists")
+        let fmt_id = |fmt: &JsonValue| fmt["format_id"].as_str().expect("format_id exists").to_owned();
+        if let Some(forced_fmt_id) = env::vars().filter(|(k,_)| k=="YO_SAL_FMT").map(|(_, v)| v).next() {
+            formats.iter()
+                .filter(|fmt| fmt_id(fmt) == forced_fmt_id)
+                .last()
+                .expect("atleast one format exists")
+        } else {
+            // DASH streams might have http/https proto and mp4_dash container.
+            // So, we don't have to change anything here.
+            formats.iter()
+                .filter(|fmt| proto(fmt).starts_with("m3u8") || proto(fmt).starts_with("http") || proto(fmt) == "")
+                .last()
+                .expect("atleast one format exists")
+        }
     } else {
         // generic, no formats
         &yt_json
