@@ -54,7 +54,25 @@ fn get_file(yt_json: &JsonValue, name: Option<String>) {
     let m3u8_cond = info["protocol"].as_str().map(|p| p.starts_with("m3u8")).unwrap_or(false);
     let dash_cond = info["container"].as_str().map(|c| c.contains("dash")).unwrap_or(false);
 
-    if m3u8_cond || dash_cond {
+    if m3u8_cond {
+        let mut args = Vec::with_capacity(16);
+
+        if let JsonValue::Object(ref hdrs_json) = info["http_headers"] {
+            for (k, v) in hdrs_json.iter() {
+                args.push("-H".into());
+                args.push(format!("{}: {}", k, strip_quotes(v.to_string())));
+            }
+        }
+
+        args.push(format!("{}", info["url"]).trim_matches('"').to_string());
+        args.push("-o".into());
+        args.push(fname);
+        println!("Running salcap with args: {:?}\n==========\n", args);
+        let _ = Command::new("/tmp2/rust/salcap/target/release/salcap")
+            .args(&args)
+            .status()
+            .expect("successful status");
+    } else if dash_cond {
         let mut args = vec!["--stream-segment-threads=2".into(), "--ringbuffer-size=100M".into()];
 
         if let JsonValue::Object(ref hdrs_json) = info["http_headers"] {
