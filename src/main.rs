@@ -64,11 +64,13 @@ fn get_file(yt_json: &JsonValue, name: Option<String>) {
             }
         }
 
+        args.push("--sub-seg-max-count=1".into());
+        args.push("-p".into());
         args.push(format!("{}", info["url"]).trim_matches('"').to_string());
         args.push("-o".into());
         args.push(fname);
-        println!("Running salcap with args: {:?}\n==========\n", args);
-        let _ = Command::new("/tmp2/rust/salcap/target/release/salcap")
+        println!("Running salgrab with args: {:?}\n==========\n", args);
+        let _ = Command::new("/tmp2/rust/salgrab/target/release/salgrab")
             .args(&args)
             .status()
             .expect("successful status");
