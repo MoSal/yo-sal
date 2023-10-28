@@ -70,7 +70,7 @@ fn get_file(yt_json: &JsonValue, name: Option<String>) {
         args.push("-o".into());
         args.push(fname);
         println!("Running salgrab with args: {:?}\n==========\n", args);
-        let _ = Command::new("/tmp2/rust/salgrab/target/release/salgrab")
+        let _ = Command::new("salgrab")
             .args(&args)
             .status()
             .expect("successful status");
@@ -115,13 +115,15 @@ fn get_file(yt_json: &JsonValue, name: Option<String>) {
 }
 
 fn main() {
+    //const ytdl: &str = "youtube-dl";
+    const YTDL: &str = "yt-dlp";
     let url = env::args().nth(1).expect("url argument provided");
 
     let info_bytes = if url.starts_with("/") {
         std::fs::read(url).unwrap()
     } else {
-        println!("Getting info from youtube-dl...");
-        let cmd = Command::new("youtube-dl")
+        println!("Getting info from {}...", YTDL);
+        let cmd = Command::new(YTDL)
             .arg("--no-playlist")
             .arg("-J")
             .arg(url)
