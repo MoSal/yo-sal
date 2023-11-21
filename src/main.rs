@@ -2,44 +2,82 @@ use std::process::Command;
 use std::env;
 use serde_json::Value as JsonValue;
 
-fn get_file(yt_json: &JsonValue, name: Option<String>) {
+enum AV {
+    AOnly,
+    VOnly,
+    Both,
+}
+
+fn get_file(yt_json: &JsonValue, name: Option<String>, av: AV) {
     let id = yt_json["id"].as_str().expect("id exists");
     let title = yt_json["fulltitle"].as_str().or_else(|| yt_json["title"].as_str()).expect("fulltitle or title exists");
-    let ext = yt_json["ext"].as_str().expect("ext exists");
-
-    let fname = if let Some(formatted_name) = name {
-        formatted_name
-            .replace("%t", &unescape::unescape(title).expect("failed to unescape"))
-            .replace("%i", id)
-            .replace("%e", ext)
-    } else {
-        format!("{}-{}.{}",
-                id,
-                unescape::unescape(title).expect("failed to unescape"),
-                ext)
-            // replace '/' too because we may not use saldl which usually takes care of this for us
-            .replace(&[' ', '/'][..], "_")
-    };
 
     let info = if let JsonValue::Array(ref formats) = yt_json["formats"] {
+        let a_only_filter = |fmt: &&serde_json::Value| {
+            let a_ext = fmt["audio_ext"].as_str();
+            a_ext != None && a_ext != Some("none")
+        };
+        let v_only_filter = |fmt: &&serde_json::Value| {
+            let v_ext = fmt["video_ext"].as_str();
+            v_ext != None && v_ext != Some("none")
+        };
+        let is_a_and_v_only_formats = {
+            let a_only = formats.iter().filter(a_only_filter).count() > 0;
+            let v_only = formats.iter().filter(v_only_filter).count() > 0;
+            a_only && v_only
+        };
+        if env::var("YO_SAL_FMT").is_err() && matches!(av, AV::Both) && is_a_and_v_only_formats { // vid-only and aud-only formats
+            get_file(yt_json, name.clone(), AV::AOnly);
+            get_file(yt_json, name, AV::VOnly);
+            return;
+        }
+
         let proto = |fmt: &JsonValue| fmt["protocol"].as_str().expect("protocol exists").to_owned();
         let fmt_id = |fmt: &JsonValue| fmt["format_id"].as_str().expect("format_id exists").to_owned();
-        if let Some(forced_fmt_id) = env::vars().filter(|(k,_)| k=="YO_SAL_FMT").map(|(_, v)| v).next() {
+        if let Ok(forced_fmt_id) = env::var("YO_SAL_FMT") {
             formats.iter()
                 .filter(|fmt| fmt_id(fmt) == forced_fmt_id)
                 .last()
                 .expect("atleast one format exists")
         } else {
+            let av_filtered_fmts = || formats.iter()
+                .filter(|fmt| matches!(av, AV::AOnly).then(|| a_only_filter(fmt)).unwrap_or(true))
+                .filter(|fmt| matches!(av, AV::VOnly).then(|| v_only_filter(fmt)).unwrap_or(true));
+
             // DASH streams might have http/https proto and mp4_dash container.
-            // So, we don't have to change anything here.
-            formats.iter()
-                .filter(|fmt| proto(fmt).starts_with("m3u8") || proto(fmt).starts_with("http") || proto(fmt) == "")
-                .last()
+            // Try hls first
+            av_filtered_fmts().filter(|fmt| proto(fmt).starts_with("m3u8")).last()
+                .or_else(|| av_filtered_fmts().filter(|fmt| proto(fmt).starts_with("http") || proto(fmt) == "").last())
                 .expect("atleast one format exists")
         }
     } else {
         // generic, no formats
         &yt_json
+    };
+
+    let ext = info["ext"].as_str().expect("ext exists");
+
+    let mut title = unescape::unescape(title).expect("failed to unescape");
+    title.truncate(128);
+
+    let fname = if let Some(formatted_name) = name {
+        formatted_name
+            .replace("%t", &title)
+            .replace("%i", id)
+            .replace("%e", ext)
+    } else {
+        format!("{}-{}.{}",
+                id,
+                title,
+                ext)
+            // replace '/' too because we may not use saldl which usually takes care of this for us
+            .replace(&[' ', '/'][..], "_")
+    };
+
+    let fname = match av {
+        AV::AOnly => fname + "-aud",
+        AV::VOnly => fname + "-vid",
+        AV::Both => fname,
     };
 
     // Value adds quotes when turned to String (e.g. via format!() like below), so we strip the quotes
@@ -162,13 +200,13 @@ fn main() {
                     s.replace_range(ext_period_pos..ext_period_pos, &name_suffix);
                     s
                 });
-                get_file(entry, name_opt);
+                get_file(entry, name_opt, AV::Both);
             }
         } else {
-            get_file(&yt_json["entries"][0], env::args().nth(2));
+            get_file(&yt_json["entries"][0], env::args().nth(2), AV::Both);
         }
     } else {
-        get_file(&yt_json, env::args().nth(2));
+        get_file(&yt_json, env::args().nth(2), AV::Both);
     }
 
 }
