@@ -58,7 +58,11 @@ fn get_file(yt_json: &JsonValue, name: Option<String>, av: AV) {
     let ext = info["ext"].as_str().expect("ext exists");
 
     let mut title = unescape::unescape(title).expect("failed to unescape");
-    title.truncate(128);
+    let mut trunc_to = 128;
+    while title.len() > 128 && !title.is_char_boundary(trunc_to) {
+        trunc_to -= 1;
+    }
+    title.truncate(trunc_to);
 
     let fname = if let Some(formatted_name) = name {
         formatted_name
